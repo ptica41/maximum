@@ -1,0 +1,4763 @@
+openapi: 3.0.2
+info:
+  title: 'Maximum'
+  version: ''
+
+paths:
+
+  /token/create/:
+    post:
+      operationId: Create token
+      summary: Create token
+      description: |
+        # Все пользователи
+        # Создание токенов
+        ## В теле запроса передаем username и password
+        ## 3 вида 401 ошибки: ERROR_INVALID_USERNAME (Неверный юзернейм), ERROR_INACTIVE_USER (неактивный пользователь), ERROR_INVALID_PASSWORD (неверный пароль) - проверка на валидность именно в этой последовательности
+        ## Активный пользователь - в ответе только активные роли и активные школы, а также активные дети пользователя по всем активным школам
+        ### Роли: director - завуч, teacher - учитель, facultative_teacher - учитель факультативов, tutor - тьютор (классный руководитель), parent - родитель, student - ученик, food - оператор питания
+      parameters: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  example: "admin"
+                  required: true
+                password:
+                  type: string
+                  example: "Maksoft2024"
+                  required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - token
+
+  /token/refresh/:
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: Refresh token
+      summary: Refresh token
+      description: |
+        # Только авторизованные пользователи
+        # Обновление токенов
+        ## В теле запроса передаем refresh токен
+        ## Если токен действителен - в ответ приходят свежие access, refresh токены и дата действия access токена, иначе ответ 401
+        ## 2 вида 400 ошибки: ERROR_REFRESH_BLACKLIST (refresh токен в черном списке (срок действия истек/использован ранее)), ERROR_REFRESH_VALID (недействительный refresh токен)
+      parameters: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh:
+                  type: string
+                  example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTcwNDM1MzY4NiwiaWF0IjoxNzAxNzYxNjg2LCJqdGkiOiJlOWU1MWFmYzM3ZWE0OWJkOTQxNDg4ZGI0YjcwMTZkMCIsInVzZXJfaWQiOjJ9.9nA9QUN68ah9kklVrTrTjSVLd0keLbyAQtFWsf22JIo"
+                  required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - token
+
+  /whoami/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get a user by access token
+      operationId: WhoAmI
+      description: |
+        ## Получение информации пользователя по access токену (активные пользователи (is_active=True))
+        ## Активный пользователь - в ответе только активные роли и активные школы, а также активные дети пользователя по всем активным школам
+        ### Роли: director - завуч, teacher - учитель, facultative_teacher - учитель факультативов, tutor - тьютор (классный руководитель), parent - родитель, student - ученик, food - оператор питания
+      parameters: [ ]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - my_info
+
+  /my-children/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get a user by access token
+      operationId: MyChildren
+      description: |
+        ## Получение информации о активных детях пользователя по access токену (активные пользователи (is_active=True))
+        ## Активный пользователь c активной ролью родитель
+        ## В заголовке передается необязательный id активной школы. Если не передается - список по всем активным школам
+      parameters:
+        - in: header
+          name: school
+          schema:
+            type: integer
+          required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - my_info
+
+  /photo/:
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: UploadPhoto
+      summary: Add a photo to storage
+      description: |
+        # Добавление фотографии в локальное хранилище
+        ## Любой активный пользователь
+      parameters: [ ]
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                photo:
+                  format: binary
+                  type: string
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - photo
+
+  /photo/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get a photo by id
+      operationId: GetPhoto
+      description: |
+        # Получение фотографии:
+        ## Любой активный пользователь
+        ### В запросе передается id photo
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          description: OK
+      tags:
+        - photo
+    patch:
+      security:
+        - bearerAuth: [ ]
+      summary: Update a photo by id
+      operationId: UpdatePhoto
+      description: |
+        # Обновление фотографии:
+        ## Важно! id фотографии должно принадлежать только одной сущности!
+        ## Фотография и миниатюра с переданным id удаляются, в ответ приходят фотография с миниатюрой с новым id (такая реализация для нужного кэширования фотографий на фронте)
+        ## Новый id заменяет старый в нужной сущности (пользователь или школа)
+        ## Любой активный пользователь - проверка на редактирование собственной фотографии и миниатюры пользователя
+        ## Активный завуч активной школы - также редактирование фотографии и миниатюры своей школы
+        ## Суперпользователь - полный доступ
+        ### В запросе передается id photo
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                photo:
+                  format: binary
+                  type: string
+      responses:
+        '200':
+          #          content:
+          #            multipart/form-data:
+          #              schema:
+          #                type: string
+          #                format: binary
+          description: OK
+      tags:
+        - photo
+    delete:
+      security:
+        - bearerAuth: [ ]
+      summary: Delete a photo by id
+      operationId: DeletePhoto
+      description: |
+        # Удаление фотографии из БД по id
+        ## Любой активный пользователь - удаление собственной фотографии и миниатюры
+        ## Активный завуч активной школы - также удаление фотографии и миниатюры своей школы
+        ## Суперпользователь - полный доступ
+        ### В запросе передается id photo
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '204':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - photo
+
+  /photo-min/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get a thumbnail photo by id
+      operationId: GetThumbnailPhoto
+      description: |
+        # Получение миниатюры фотографии:
+        ## Любой активный пользователь
+        ### В запросе передается id photo
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          description: OK
+      tags:
+        - photo
+
+  /users/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get user's list by token
+      operationId: Users
+      description: |
+        # Получение списка пользователей:
+        ## Суперпользователь - абсолютно все пользователи
+        ## Завуч - видит всех активных пользователей (например для создания ролей и добавления в школу)
+        ## Активный пользователь - просмотр всех активных пользователей, которые состоят в тех же школах что и request.user
+        # Если указан school_id:
+        ## Суперпользователь - список всех пользователей с активными и неактивными ролями любой школы
+        ## Активный завуч - список активных пользователей с активными и неактивными ролями в активной школе, в которой должен состоять request.user
+        ## Пользователь (активный) - список активных пользователей с активными ролями активной школы, в которой должен состоять request.user
+        # Важно! фильтрация по полю "role_is_active" будет корректно работать только если в запросе указан school_id
+      parameters:
+        - in: header
+          name: school
+          schema:
+            type: integer
+          required: false
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search by surname
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, username, surname, name, middle_name, birthday, email, phone, is_active
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+#        - in: query
+#          name: page
+#          schema:
+#            type: integer
+#          description: The page of items
+        - in: query
+          name: is_active
+          schema:
+            type: boolean
+          description: filter by is_active
+        - in: query
+          name: role_is_active
+          schema:
+            type: boolean
+          description: filter by role_is_active
+        - in: query
+          name: date_joined__lte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by less date_joined
+        - in: query
+          name: date_joined__gte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by great date_joined
+        - in: query
+          name: last_login__lte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by less last_login
+        - in: query
+          name: last_login__gte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by great last_login
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - users
+
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: CreateUser
+      summary: Create a user
+      description: |
+        # Создание пользователя
+        ## Доступ только у суперпользователя
+        ## В request body перечислены все возможные поля (ненужные удалить)
+        ### Обязательные поля: "username", "password", "surname", "name"
+        ### Уникальные поля: "username"
+        ### Проверка на валидацию username, male (MALE или FEMALE только), birthday, phone, email, photo
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  example: username
+                password:
+                  type: string
+                  example: Maksoft2024
+                surname:
+                  type: string
+                  example: surname
+                name:
+                  type: string
+                  example: name
+                middle_name:
+                  type: string
+                  example: middle_name
+                male:
+                  type: string
+                  example: FEMALE
+                birthday:
+                  type: date
+                  example: "2000-02-21"
+                phone:
+                  type: string
+                  example: +79991112233
+                email:
+                  type: string
+                  example: info@info.ru
+                passport_series:
+                  type: string
+                  example: "1234"
+                passport_number:
+                  type: string
+                  example: "123456"
+                certificate_series:
+                  type: string
+                  example: "00-AA"
+                certificate_number:
+                  type: string
+                  example: "123456"
+                is_active:
+                  type: boolean
+                  example: True
+                photo:
+                  type: integer
+                  example: 1
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - users
+
+  /users/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get the user by id
+      operationId: GetUser
+      description: |
+        # Получение пользователя
+        ## Суперпользователь - полный доступ (полная информация, кроме пароля)
+        ## Завуч также может просматривать неактивных (роли) пользователей своей активной школы
+        ## Активные пользователи - если request.user и пользователь состоят хотя бы в одной активной школе - в ответ приходит пользователь (если он активный)
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - users
+    patch:
+      security:
+        - bearerAuth: [ ]
+      summary: Update the user by id
+      operationId: UpdateUser
+      description: |
+        # Редактирование пользователя
+        ## Суперпользователь - полный доступ
+        ## Активный пользователь - редактирование собственного профиля, для него доступны ТОЛЬКО поля: 
+        ## username, phone, email, photo, is_active
+        ### Указаны все доступные поля. Ненужные поля можно стереть.
+        ### Проверка на валидацию username, male (MALE или FEMALE только), birthday, phone, email, photo
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  example: username
+                password:
+                  type: string
+                  example: Maksoft2024
+                surname:
+                  type: string
+                  example: surname
+                name:
+                  type: string
+                  example: name
+                middle_name:
+                  type: string
+                  example: middle_name
+                male:
+                  type: string
+                  example: FEMALE
+                birthday:
+                  type: date
+                  example: "2000-02-21"
+                phone:
+                  type: string
+                  example: +79991112233
+                email:
+                  type: string
+                  example: info@info.ru
+                passport_series:
+                  type: string
+                  example: "1234"
+                passport_number:
+                  type: string
+                  example: "123456"
+                certificate_series:
+                  type: string
+                  example: "00-AA"
+                certificate_number:
+                  type: string
+                  example: "123456"
+                is_active:
+                  type: boolean
+                  example: True
+                photo:
+                  type: integer
+                  example: 1
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - users
+
+    delete:
+      security:
+        - bearerAuth: [ ]
+      summary: Delete the user by id
+      operationId: DeleteUser
+      description: |
+        # Удаление пользователя из БД
+        ## Доступ только у суперпользователя
+        ## Остальные пользователи могут делать профиль неактивным is_active=False через метод PATCH
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '204':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - users
+
+  /users/{id}/roles/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get the user's roles by id
+      operationId: GetUserRoles
+      description: |
+        # Получение ролей пользователя
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - любые роли только активных пользователей во всех активных школах, где является активным завучем
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+        - in: header
+          name: school
+          schema:
+            type: integer
+          required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - users
+
+  /schools/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get a school's list by token
+      operationId: Schools
+      description: |
+        # Список школ
+        ## Суперпользователь - список всех школ
+        ## Пользователь (активный) - список активных школ
+      parameters: [ ]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - schools
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: CreateSchool
+      summary: Create a school by administrator
+      description: |
+        # Создание школы
+        ## Только суперпользователь
+        ### Указаны все возможные поля для добавления. Необязательное только поле "photo"
+        ### Для timezone доступные значения: '+00:00', '+01:00', '+02:00', '+03:00', '+04:00', '+05:00', '+06:00', '+07:00', '+08:00', '+09:00', '+10:00', '+11:00', '+12:00'
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Школа 1
+                timezone:
+                  type: string
+                  example: +03:00
+                photo:
+                  type: integer
+                  example: 1
+                is_active:
+                  type: boolean
+                  example: True
+            required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - schools
+
+  /schools/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get the school by id
+      operationId: GetSchool
+      description: |
+        # Получение школы
+        ## Суперпользователь - полный доступ
+        ## Авторизованные активные пользователи - только активные школы
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - schools
+    patch:
+      security:
+        - bearerAuth: [ ]
+      summary: Update the school by id
+      operationId: UpdateSchool
+      description: |
+        # Редактирование школы
+        ## Суперпользователь - полный доступ
+        ## Активный завуч своей активной школы - может менять photo и name
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Школа 1
+                timezone:
+                  type: string
+                  example: +03:00
+                photo:
+                  type: integer
+                  example: 1
+                is_active:
+                  type: boolean
+                  example: True
+            required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - schools
+    delete:
+      security:
+        - bearerAuth: [ ]
+      summary: Delete the school by id
+      operationId: DeleteSchool
+      description: |
+        # Удаление школы из БД
+        ## Админ
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '204':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - schools
+
+  /schools/{id}/directors/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get a school's directors by id
+      operationId: DirectorsSchool
+      description: |
+        # Список завучей школы
+        ## Админ - список всех пользователей с активными и неактивными ролями "завуч" любой школы
+        ## Активный завуч - список активных пользователей с активными и неактивными ролями "завуч" в активной школе, в которой должен состоять request.user
+        ## Пользователь (активный) - список активных пользователей с активными ролями "завуч" активной школы, в которой должен состоять request.user
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search by surname
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, username, surname, name, middle_name, birthday, email, phone, is_active
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+#        - in: query
+#          name: page
+#          schema:
+#            type: integer
+#          description: The page of items
+        - in: query
+          name: is_active
+          schema:
+            type: boolean
+          description: filter by is_active
+        - in: query
+          name: role_is_active
+          schema:
+            type: boolean
+          description: filter by role_is_active
+        - in: query
+          name: date_joined__lte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by less date_joined
+        - in: query
+          name: date_joined__gte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by great date_joined
+        - in: query
+          name: last_login__lte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by less last_login
+        - in: query
+          name: last_login__gte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by great last_login
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - schools
+
+  /schools/{id}/teachers/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get a school's teachers by id
+      operationId: TeachersSchool
+      description: |
+        # Список учителей школы
+        ## Админ - список всех пользователей с активными и неактивными ролями "учитель" любой школы
+        ## Активный завуч - список активных пользователей с активными и неактивными ролями "учитель" в активной школе, в которой должен состоять request.user
+        ## Пользователь (активный) - список активных пользователей с активными ролями "учитель" активной школы, в которой должен состоять request.user
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search by surname
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, username, surname, name, middle_name, birthday, email, phone, is_active
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+#        - in: query
+#          name: page
+#          schema:
+#            type: integer
+#          description: The page of items
+        - in: query
+          name: is_active
+          schema:
+            type: boolean
+          description: filter by is_active
+        - in: query
+          name: role_is_active
+          schema:
+            type: boolean
+          description: filter by role_is_active
+        - in: query
+          name: date_joined__lte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by less date_joined
+        - in: query
+          name: date_joined__gte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by great date_joined
+        - in: query
+          name: last_login__lte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by less last_login
+        - in: query
+          name: last_login__gte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by great last_login
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - schools
+
+  /schools/{id}/facultative-teachers/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get a school's facultative teachers by id
+      operationId: FacultativeTeachersSchool
+      description: |
+        # Список учителей факультативов школы
+        ## Админ - список всех пользователей с активными и неактивными ролями "учитель факультативов" любой школы
+        ## Активный завуч - список активных пользователей с активными и неактивными ролями "учитель факультативов" в активной школе, в которой должен состоять request.user
+        ## Пользователь (активный) - список активных пользователей с активными ролями "учитель факультативов" активной школы, в которой должен состоять request.user
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search by surname
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, username, surname, name, middle_name, birthday, email, phone, is_active
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+#        - in: query
+#          name: page
+#          schema:
+#            type: integer
+#          description: The page of items
+        - in: query
+          name: is_active
+          schema:
+            type: boolean
+          description: filter by is_active
+        - in: query
+          name: role_is_active
+          schema:
+            type: boolean
+          description: filter by role_is_active
+        - in: query
+          name: date_joined__lte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by less date_joined
+        - in: query
+          name: date_joined__gte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by great date_joined
+        - in: query
+          name: last_login__lte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by less last_login
+        - in: query
+          name: last_login__gte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by great last_login
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - schools
+
+  /schools/{id}/tutors/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get a school's tutors by id
+      operationId: TutorsSchool
+      description: |
+        # Список тьюторов школы
+        ## Админ - список всех пользователей с активными и неактивными ролями "тьютор" любой школы
+        ## Активный завуч - список активных пользователей с активными и неактивными ролями "тьютор" в активной школе, в которой должен состоять request.user
+        ## Пользователь (активный) - список активных пользователей с активными ролями "тьютор" активной школы, в которой должен состоять request.user
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search by surname
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, username, surname, name, middle_name, birthday, email, phone, is_active
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+#        - in: query
+#          name: page
+#          schema:
+#            type: integer
+#          description: The page of items
+        - in: query
+          name: is_active
+          schema:
+            type: boolean
+          description: filter by is_active
+        - in: query
+          name: role_is_active
+          schema:
+            type: boolean
+          description: filter by role_is_active
+        - in: query
+          name: date_joined__lte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by less date_joined
+        - in: query
+          name: date_joined__gte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by great date_joined
+        - in: query
+          name: last_login__lte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by less last_login
+        - in: query
+          name: last_login__gte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by great last_login
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - schools
+
+  /schools/{id}/parents/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get a school's parents by id
+      operationId: ParentsSchool
+      description: |
+        # Список родителей школы
+        ## Админ - список всех пользователей с активными и неактивными ролями "родитель" любой школы
+        ## Активный завуч - список активных пользователей с активными и неактивными ролями "родитель" в активной школе, в которой должен состоять request.user
+        ## Пользователь (активный) - список активных пользователей с активными ролями "родитель" активной школы, в которой должен состоять request.user
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search by surname
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, username, surname, name, middle_name, birthday, email, phone, is_active
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+#        - in: query
+#          name: page
+#          schema:
+#            type: integer
+#          description: The page of items
+        - in: query
+          name: is_active
+          schema:
+            type: boolean
+          description: filter by is_active
+        - in: query
+          name: role_is_active
+          schema:
+            type: boolean
+          description: filter by role_is_active
+        - in: query
+          name: date_joined__lte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by less date_joined
+        - in: query
+          name: date_joined__gte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by great date_joined
+        - in: query
+          name: last_login__lte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by less last_login
+        - in: query
+          name: last_login__gte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by great last_login
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - schools
+
+  /schools/{id}/students/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get a school's students by id
+      operationId: StudentsSchool
+      description: |
+        # Список учеников школы
+        ## Админ - список всех пользователей с активными и неактивными ролями "ученик" любой школы
+        ## Активный завуч - список активных пользователей с активными и неактивными ролями "ученик" в активной школе, в которой должен состоять request.user
+        ## Пользователь (активный) - список активных пользователей с активными ролями "ученик" активной школы, в которой должен состоять request.user
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search by surname
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, username, surname, name, middle_name, birthday, email, phone, is_active
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+#        - in: query
+#          name: page
+#          schema:
+#            type: integer
+#          description: The page of items
+        - in: query
+          name: is_active
+          schema:
+            type: boolean
+          description: filter by is_active
+        - in: query
+          name: role_is_active
+          schema:
+            type: boolean
+          description: filter by role_is_active
+        - in: query
+          name: date_joined__lte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by less date_joined
+        - in: query
+          name: date_joined__gte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by great date_joined
+        - in: query
+          name: last_login__lte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by less last_login
+        - in: query
+          name: last_login__gte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by great last_login
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - schools
+
+  /schools/{id}/foods/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get a school's foods by id
+      operationId: FoodsSchool
+      description: |
+        # Список операторов питания школы
+        ## Админ - список всех пользователей с активными и неактивными ролями "оператор питания" любой школы
+        ## Активный завуч - список активных пользователей с активными и неактивными ролями "оператор питания" в активной школе, в которой должен состоять request.user
+        ## Пользователь (активный) - список активных пользователей с активными ролями "оператор питания" активной школы, в которой должен состоять request.user
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search by surname
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, username, surname, name, middle_name, birthday, email, phone, is_active
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+#        - in: query
+#          name: page
+#          schema:
+#            type: integer
+#          description: The page of items
+        - in: query
+          name: is_active
+          schema:
+            type: boolean
+          description: filter by is_active
+        - in: query
+          name: role_is_active
+          schema:
+            type: boolean
+          description: filter by role_is_active
+        - in: query
+          name: date_joined__lte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by less date_joined
+        - in: query
+          name: date_joined__gte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by great date_joined
+        - in: query
+          name: last_login__lte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by less last_login
+        - in: query
+          name: last_login__gte
+          schema:
+            type: string
+            format: date
+            example: "2024-02-22"
+          description: filter by great last_login
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - schools
+
+  /schools/{id}/parent-child/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get a school's parent-child by id
+      operationId: ParentChildSchool
+      description: |
+        # Список пользователей школы с ролями родитель-ученик
+        ## Админ - список всех пользователей с активными и неактивными ролями в роли "родитель-ученик" любой школы
+        ## Активный завуч - список активных пользователей с активными и неактивными ролями в роли "родитель-ученик" в активной школе, в которой должен состоять request.user
+        ## Пользователь (активный) - список активных пользователей с активными ролями в роли "родитель-ученик" активной школы, в которой должен состоять request.user
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, child, parent
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+#        - in: query
+#          name: page
+#          schema:
+#            type: integer
+#          description: The page of items
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - schools
+
+  /roles/directors/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get director's list by token
+      operationId: Directors
+      description: |
+        # Получение списка завучей:
+        ## Суперпользователь - абсолютно все пользователи с любыми ролями "завуч"
+      parameters:
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, is_active, school, user
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+#        - in: query
+#          name: page
+#          schema:
+#            type: integer
+#          description: The page of items
+        - in: query
+          name: is_active
+          schema:
+            type: boolean
+          description: filter by is_active
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: CreateDirector
+      summary: Create a director
+      description: |
+        # Создание роли "Завуч" у пользователя
+        ## Cуперпользователь - полный доступ
+        ## Активный завуч - проверка на создание роли для собственной активной школы и активного пользователя
+        ## В request body перечислены все возможные поля (ненужные удалить)
+        ### Обязательные поля: "user_id", "school_id"
+        ### Проверка на уникальность - сочетания таких же user_id и school_id не должно быть
+        ### Проверка на валидацию - существование экземпляров моделей с указанными id
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                  example: 1
+                school_id:
+                  type: integer
+                  example: 1
+                is_active:
+                  type: boolean
+                  example: True
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+  /roles/directors/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get the director by id
+      operationId: GetDirector
+      description: |
+        # Получение завуча
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - любые роли активных пользователей в своей активной школе
+        ## Активный пользователь - активные роли активных пользователей в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+    patch:
+      security:
+        - bearerAuth: [ ]
+      summary: Update the director by id
+      operationId: UpdateDirector
+      description: |
+        # Редактирование роли завуч
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - редактирование ролей активных пользователей в своей активной школе и для активных пользователей
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                  example: 1
+                school_id:
+                  type: integer
+                  example: 1
+                is_active:
+                  type: boolean
+                  example: True
+            required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+    delete:
+      security:
+        - bearerAuth: [ ]
+      summary: Delete the director by id
+      operationId: DeleteDirector
+      description: |
+        # Удаление роли завуча из БД
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - удаление ролей активных пользователей в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '204':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+  /roles/teachers/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get teacher's list by token
+      operationId: Teachers
+      description: |
+        # Получение списка учителей:
+        ## Суперпользователь - абсолютно все пользователи с любыми ролями "учитель"
+      parameters:
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, is_active, school, user
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+#        - in: query
+#          name: page
+#          schema:
+#            type: integer
+#          description: The page of items
+        - in: query
+          name: is_active
+          schema:
+            type: boolean
+          description: filter by is_active
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: CreateTeacher
+      summary: Create a teacher
+      description: |
+        # Создание роли "Учитель" у пользователя
+        ## Cуперпользователь - полный доступ
+        ## Активный завуч - проверка на создание роли для собственной активной школы и активного пользователя
+        ## В request body перечислены все возможные поля (ненужные удалить)
+        ### Обязательные поля: "user_id", "school_id"
+        ### Проверка на уникальность - сочетания таких же user_id и school_id не должно быть
+        ### Проверка на валидацию - существование экземпляров моделей с указанными id
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                  example: 1
+                school_id:
+                  type: integer
+                  example: 1
+                is_active:
+                  type: boolean
+                  example: True
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+  /roles/teachers/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get the teacher by id
+      operationId: GetTeacher
+      description: |
+        # Получение учителя
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - любые роли активных пользователей в своей активной школе
+        ## Активный пользователь - активные роли активных пользователей в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+    patch:
+      security:
+        - bearerAuth: [ ]
+      summary: Update the teacher by id
+      operationId: UpdateTeacher
+      description: |
+        # Редактирование роли учитель
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - редактирование ролей активных пользователей в своей активной школе и для активных пользователей
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                  example: 1
+                school_id:
+                  type: integer
+                  example: 1
+                is_active:
+                  type: boolean
+                  example: True
+            required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+    delete:
+      security:
+        - bearerAuth: [ ]
+      summary: Delete the teacher by id
+      operationId: DeleteTeacher
+      description: |
+        # Удаление роли учитель из БД
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - удаление ролей активных пользователей в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '204':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+  /roles/facultative-teachers/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get facultative-teacher's list by token
+      operationId: FacultativeTeachers
+      description: |
+        # Получение списка учителей факультативов:
+        ## Суперпользователь - абсолютно все пользователи с любыми ролями "учитель факультативов"
+      parameters:
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, is_active, school, user
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+#        - in: query
+#          name: page
+#          schema:
+#            type: integer
+#          description: The page of items
+        - in: query
+          name: is_active
+          schema:
+            type: boolean
+          description: filter by is_active
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: CreateFacultativeTeacher
+      summary: Create a facultative teacher
+      description: |
+        # Создание роли "Учитель факультативов" у пользователя
+        ## Cуперпользователь - полный доступ
+        ## Активный завуч - проверка на создание роли для собственной активной школы и активного пользователя
+        ## В request body перечислены все возможные поля (ненужные удалить)
+        ### Обязательные поля: "user_id", "school_id"
+        ### Проверка на уникальность - сочетания таких же user_id и school_id не должно быть
+        ### Проверка на валидацию - существование экземпляров моделей с указанными id
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                  example: 1
+                school_id:
+                  type: integer
+                  example: 1
+                is_active:
+                  type: boolean
+                  example: True
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+  /roles/facultative-teachers/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get the facultative teacher by id
+      operationId: GetFacultativeTeacher
+      description: |
+        # Получение учителя факультативов
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - любые роли активных пользователей в своей активной школе
+        ## Активный пользователь - активные роли активных пользователей в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+    patch:
+      security:
+        - bearerAuth: [ ]
+      summary: Update the facultative teacher by id
+      operationId: UpdateFacultativeTeacher
+      description: |
+        # Редактирование роли учителя факультативов
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - редактирование ролей активных пользователей в своей активной школе и для активных пользователей
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                  example: 1
+                school_id:
+                  type: integer
+                  example: 1
+                is_active:
+                  type: boolean
+                  example: True
+            required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+    delete:
+      security:
+        - bearerAuth: [ ]
+      summary: Delete the facultative teacher by id
+      operationId: DeleteFacultativeTeacher
+      description: |
+        # Удаление роли учителя факультативов из БД
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - удаление ролей активных пользователей в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '204':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+  /roles/tutors/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get tutor's list by token
+      operationId: Tutors
+      description: |
+        # Получение списка тьюторов:
+        ## Суперпользователь - абсолютно все пользователи с любыми ролями "тьютор"
+      parameters:
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, is_active, school, user
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+#        - in: query
+#          name: page
+#          schema:
+#            type: integer
+#          description: The page of items
+        - in: query
+          name: is_active
+          schema:
+            type: boolean
+          description: filter by is_active
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: CreateTutor
+      summary: Create a tutor
+      description: |
+        # Создание роли "тьютор" у пользователя
+        ## Cуперпользователь - полный доступ
+        ## Активный завуч - проверка на создание роли для собственной активной школы и активного пользователя
+        ## В request body перечислены все возможные поля (ненужные удалить)
+        ### Обязательные поля: "user_id", "school_id"
+        ### Проверка на уникальность - сочетания таких же user_id и school_id не должно быть
+        ### Проверка на валидацию - существование экземпляров моделей с указанными id
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                  example: 1
+                school_id:
+                  type: integer
+                  example: 1
+                is_active:
+                  type: boolean
+                  example: True
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+  /roles/tutors/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get the tutor by id
+      operationId: GetTutor
+      description: |
+        # Получение тьютора
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - любые роли активных пользователей в своей активной школе
+        ## Активный пользователь - активные роли активных пользователей в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+    patch:
+      security:
+        - bearerAuth: [ ]
+      summary: Update the tutor by id
+      operationId: UpdateTutor
+      description: |
+        # Редактирование роли тьютор
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - редактирование ролей активных пользователей в своей активной школе и для активных пользователей
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                  example: 1
+                school_id:
+                  type: integer
+                  example: 1
+                is_active:
+                  type: boolean
+                  example: True
+            required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+    delete:
+      security:
+        - bearerAuth: [ ]
+      summary: Delete the tutor by id
+      operationId: DeleteTutor
+      description: |
+        # Удаление роли тьютор из БД
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - удаление ролей активных пользователей в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '204':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+  /roles/parents/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get parent's list by token
+      operationId: Parents
+      description: |
+        # Получение списка родителей:
+        ## Суперпользователь - абсолютно все пользователи с любыми ролями "родитель"
+      parameters:
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, is_active, school, user
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+#        - in: query
+#          name: page
+#          schema:
+#            type: integer
+#          description: The page of items
+        - in: query
+          name: is_active
+          schema:
+            type: boolean
+          description: filter by is_active
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: CreateParent
+      summary: Create a parent
+      description: |
+        # Создание роли "родитель" у пользователя
+        ## Cуперпользователь - полный доступ
+        ## Активный завуч - проверка на создание роли для собственной активной школы и активного пользователя
+        ## В request body перечислены все возможные поля (ненужные удалить)
+        ### Обязательные поля: "user_id", "school_id"
+        ### Проверка на уникальность - сочетания таких же user_id и school_id не должно быть
+        ### Проверка на валидацию - существование экземпляров моделей с указанными id
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                  example: 1
+                school_id:
+                  type: integer
+                  example: 1
+                is_active:
+                  type: boolean
+                  example: True
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+  /roles/parents/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get the parent by id
+      operationId: GetParent
+      description: |
+        # Получение родителя
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - любые роли активных пользователей в своей активной школе
+        ## Активный пользователь - активные роли активных пользователей в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+    patch:
+      security:
+        - bearerAuth: [ ]
+      summary: Update the parent by id
+      operationId: UpdateParent
+      description: |
+        # Редактирование роли родитель
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - редактирование ролей активных пользователей в своей активной школе и для активных пользователей
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                  example: 1
+                school_id:
+                  type: integer
+                  example: 1
+                is_active:
+                  type: boolean
+                  example: True
+            required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+    delete:
+      security:
+        - bearerAuth: [ ]
+      summary: Delete the parent by id
+      operationId: DeleteParent
+      description: |
+        # Удаление роли родитель из БД
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - удаление ролей активных пользователей в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '204':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+  /roles/students/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get student's list by token
+      operationId: Students
+      description: |
+        # Получение списка учеников:
+        ## Суперпользователь - абсолютно все пользователи с любыми ролями "ученик"
+      parameters:
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, is_active, school, user
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+#        - in: query
+#          name: page
+#          schema:
+#            type: integer
+#          description: The page of items
+        - in: query
+          name: is_active
+          schema:
+            type: boolean
+          description: filter by is_active
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: CreateStudent
+      summary: Create a student
+      description: |
+        # Создание роли "ученик" у пользователя
+        ## Cуперпользователь - полный доступ
+        ## Активный завуч - проверка на создание роли для собственной активной школы и активного пользователя
+        ## В request body перечислены все возможные поля (ненужные удалить)
+        ### Обязательные поля: "user_id", "school_id"
+        ### Проверка на уникальность - сочетания таких же user_id и school_id не должно быть
+        ### Проверка на валидацию - существование экземпляров моделей с указанными id
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                  example: 1
+                school_id:
+                  type: integer
+                  example: 1
+                is_active:
+                  type: boolean
+                  example: True
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+  /roles/students/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get the student by id
+      operationId: GetStudent
+      description: |
+        # Получение ученика
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - любые роли активных пользователей в своей активной школе
+        ## Активный пользователь - активные роли активных пользователей в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+    patch:
+      security:
+        - bearerAuth: [ ]
+      summary: Update the student by id
+      operationId: UpdateStudent
+      description: |
+        # Редактирование роли ученик
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - редактирование ролей активных пользователей в своей активной школе и для активных пользователей
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                  example: 1
+                school_id:
+                  type: integer
+                  example: 1
+                is_active:
+                  type: boolean
+                  example: True
+            required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+    delete:
+      security:
+        - bearerAuth: [ ]
+      summary: Delete the student by id
+      operationId: DeleteStudent
+      description: |
+        # Удаление роли ученик из БД
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - удаление ролей активных пользователей в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '204':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+  /roles/foods/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get food's list by token
+      operationId: Foods
+      description: |
+        # Получение списка операторов питания:
+        ## Суперпользователь - абсолютно все пользователи с любыми ролями "оператор питания"
+      parameters:
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, is_active, school, user
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+#        - in: query
+#          name: page
+#          schema:
+#            type: integer
+#          description: The page of items
+        - in: query
+          name: is_active
+          schema:
+            type: boolean
+          description: filter by is_active
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: CreateFood
+      summary: Create a food
+      description: |
+        # Создание роли "оператор питания" у пользователя
+        ## Cуперпользователь - полный доступ
+        ## Активный завуч - проверка на создание роли для собственной активной школы и активного пользователя
+        ## В request body перечислены все возможные поля (ненужные удалить)
+        ### Обязательные поля: "user_id", "school_id"
+        ### Проверка на уникальность - сочетания таких же user_id и school_id не должно быть
+        ### Проверка на валидацию - существование экземпляров моделей с указанными id
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                  example: 1
+                school_id:
+                  type: integer
+                  example: 1
+                is_active:
+                  type: boolean
+                  example: True
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+  /roles/foods/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get the food by id
+      operationId: GetFood
+      description: |
+        # Получение оператора питания
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - любые роли активных пользователей в своей активной школе
+        ## Активный пользователь - активные роли активных пользователей в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+    patch:
+      security:
+        - bearerAuth: [ ]
+      summary: Update the food by id
+      operationId: UpdateFood
+      description: |
+        # Редактирование роли оператор питания
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - редактирование ролей активных пользователей в своей активной школе и для активных пользователей
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                  example: 1
+                school_id:
+                  type: integer
+                  example: 1
+                is_active:
+                  type: boolean
+                  example: True
+            required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+    delete:
+      security:
+        - bearerAuth: [ ]
+      summary: Delete the parent by id
+      operationId: DeleteFood
+      description: |
+        # Удаление роли завуча из БД
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - удаление ролей активных пользователей в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '204':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+  /roles/parent-child/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get parent-child's list by token
+      operationId: ParentChild
+      description: |
+        # Получение списка родителей-детей:
+        ## Суперпользователь - абсолютно все записи "родитель-ребенок"
+      parameters:
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, parent, child
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+#        - in: query
+#          name: page
+#          schema:
+#            type: integer
+#          description: The page of items
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: CreateParentChild
+      summary: Create a parent-child
+      description: |
+        # Создание роли родитель-ребенок
+        ## Cуперпользователь - полный доступ
+        ## Активный завуч - создание роли для активных пользователей с указанием любых ролей "родитель" и "ученик". Завуч должен быть в той же активной школе.
+        Важно! При создании записи идет проверка на совпадение школы у родителя и ребенка (ученика).
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                child_id:
+                  type: integer
+                  example: 1
+                parent_id:
+                  type: integer
+                  example: 1
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+  /roles/parent-child/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get parent-child by id
+      operationId: GetParentChild
+      description: |
+        # Получение роли родитель-ребенок
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - любые роли активных пользователей в своей активной школе
+        ## Активный пользователь - активные роли активных пользователей в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+    patch:
+      security:
+        - bearerAuth: [ ]
+      summary: Update the parent-child by id
+      operationId: UpdateParentChild
+      description: |
+        # Редактирование роли родитель-ребенок
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - редактирование ролей активных пользователей в своей активной школе и для активных пользователей
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                child_id:
+                  type: integer
+                  example: 1
+                parent_id:
+                  type: integer
+                  example: 1
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+    delete:
+      security:
+        - bearerAuth: [ ]
+      summary: Delete the parent-child by id
+      operationId: DeleteParentChild
+      description: |
+        # Удаление роли родитель-ребенок из БД
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - удаление ролей активных пользователей в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '204':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - roles
+
+  /objects/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get object's list by token
+      operationId: Objects
+      description: |
+        # Получение списка предметов:
+        ## Суперпользователь - абсолютно все предметы
+        ## Активный пользователь - просмотр всех предметов в активных школах, в которых состоит и request.user
+      parameters:
+        - in: query
+          name: school_id
+          schema:
+            type: integer
+          description: filter by school_id
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search by name
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, name, school
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - objects
+
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: CreateObject
+      summary: Create a object
+      description: |
+        # Создание предмета
+        ## Cуперпользователь - создание предметов для любых школ
+        ## Активный завуч - создание предметов только в своей активной школе
+        ## В request body перечислены все возможные поля (все обязательные)
+        ### Обязательные поля: "name", "school_id"
+        ### Проверка на валидацию school_id
+        ### Проверка на уникальность названия внутри школы
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: name
+                school_id:
+                  type: integer
+                  example: 1
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - objects
+
+  /objects/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get the object by id
+      operationId: GetObject
+      description: |
+        # Получение предмета
+        ## Суперпользователь - полный доступ
+        ## Активный пользователь - просмотр предмета в активной школе, в которой состоит и request.user
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - objects
+    patch:
+      security:
+        - bearerAuth: [ ]
+      summary: Update the object by id
+      operationId: UpdateObject
+      description: |
+        # Редактирование предмета
+        ## Cуперпользователь - редактирование предмета для любых школ
+        ## Активный завуч - редактирование предмета только в своей активной школе
+        ## В request body перечислены все возможные поля
+        ### Проверка на валидацию school_id
+        ### Проверка на уникальность названия внутри школы
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: name
+                school_id:
+                  type: integer
+                  example: 1
+            required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - objects
+    delete:
+      security:
+        - bearerAuth: [ ]
+      summary: Delete the object by id
+      operationId: DeleteObject
+      description: |
+        # Удаление предмета из БД
+        ## Cуперпользователь - удаление предмета для любых школ
+        ## Активный завуч - удаление предмета только в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '204':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - objects
+
+  /cabinets/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get cabinet's list by token
+      operationId: Cabinets
+      description: |
+        # Получение списка кабинетов:
+        ## Суперпользователь - абсолютно все кабинетов
+        ## Активный пользователь - просмотр всех кабинетов в активных школах, в которых состоит и request.user
+      parameters:
+        - in: query
+          name: school_id
+          schema:
+            type: integer
+          description: filter by school_id
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search by name
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, name, school
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - cabinets
+
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: CreateCabinet
+      summary: Create a cabinet
+      description: |
+        # Создание кабинета
+        ## Cуперпользователь - создание кабинетов для любых школ
+        ## Активный завуч - создание кабинетов только в своей активной школе
+        ## В request body перечислены все возможные поля (все обязательные)
+        ### Обязательные поля: "name", "school_id"
+        ### Проверка на валидацию school_id
+        ### Проверка на уникальность названия внутри школы
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: name
+                school_id:
+                  type: integer
+                  example: 1
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - cabinets
+
+  /cabinets/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get the cabinet by id
+      operationId: GetCabinet
+      description: |
+        # Получение кабинета
+        ## Суперпользователь - полный доступ
+        ## Активный пользователь - просмотр кабинета в активной школе, в которой состоит и request.user
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - cabinets
+    patch:
+      security:
+        - bearerAuth: [ ]
+      summary: Update the cabinet by id
+      operationId: UpdateCabinet
+      description: |
+        # Редактирование кабинета
+        ## Cуперпользователь - редактирование кабинета для любых школ
+        ## Активный завуч - редактирование кабинета только в своей активной школе
+        ## В request body перечислены все возможные поля
+        ### Проверка на валидацию school_id
+        ### Проверка на уникальность названия внутри школы
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: name
+                school_id:
+                  type: integer
+                  example: 1
+            required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - cabinets
+    delete:
+      security:
+        - bearerAuth: [ ]
+      summary: Delete the cabinet by id
+      operationId: DeleteCabinet
+      description: |
+        # Удаление кабинета из БД
+        ## Cуперпользователь - удаление кабинета для любых школ
+        ## Активный завуч - удаление кабинета только в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '204':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - cabinets
+
+  /classes/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get class's list by token
+      operationId: Classes
+      description: |
+        # Получение списка классов:
+        ## Суперпользователь - абсолютно все классы
+        ## Активный пользователь - просмотр всех кабинетов в активных школах, в которых состоит и request.user
+        ## Добавлена фильтрация по school_id в header
+      parameters:
+        - in: header
+          name: school
+          schema:
+            type: integer
+          description: filter by school_id
+          required: false
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search by name
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, name, tutor, cabinet
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - classes
+
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: CreateClass
+      summary: Create a class
+      description: |
+        # Создание класса
+        ## Cуперпользователь - создание классов для любых школ
+        ## Активный завуч - создание классов только в своей активной школе
+        ## В request body перечислены все возможные поля (все обязательные)
+        ### Обязательные поля: "name", "tutor_id", "cabinet_id"
+        ### Проверка is_active=true у user в поле tutor_id
+        ### Проверка на валидацию tutor_id - роль и пользователь должны быть активными
+        ### Проверка на валидацию cabinet_id
+        ### Проверка на уникальность названия внутри школы
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: name
+                tutor_id:
+                  type: integer
+                  example: 1
+                cabinet_id:
+                  type: integer
+                  example: 1
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - classes
+
+  /classes/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get the class by id
+      operationId: GetClass
+      description: |
+        # Получение класса
+        ## Суперпользователь - полный доступ
+        ## Активный пользователь - просмотр класса в активной школе, в которой состоит и request.user
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - classes
+    patch:
+      security:
+        - bearerAuth: [ ]
+      summary: Update the class by id
+      operationId: UpdateClass
+      description: |
+        # Редактирование класса
+        ## Cуперпользователь - редактирование класса для любых школ
+        ## Активный завуч - редактирование класса только в своей активной школе
+        ## В request body перечислены все возможные поля
+        ### Проверка на валидацию tutor_id - роль и пользователь должны быть активными
+        ### Проверка на валидацию cabinet_id
+        ### Проверка на уникальность названия внутри школы
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: name
+                tutor_id:
+                  type: integer
+                  example: 1
+                cabinet_id:
+                  type: integer
+                  example: 1
+            required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - classes
+    delete:
+      security:
+        - bearerAuth: [ ]
+      summary: Delete the class by id
+      operationId: DeleteClass
+      description: |
+        # Удаление класса из БД
+        ## Cуперпользователь - удаление класса для любых школ
+        ## Активный завуч - удаление класса только в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '204':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - classes
+
+  /student-classes/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get student-classes list by token
+      operationId: StudentClasses
+      description: |
+        # Получение списка ученик-класс:
+        ## Суперпользователь - абсолютно все записи "ученик-класс"
+        ## Активный завуч - список всех записей "ученик-класс" с активными пользователями активной школы, в которой должен состоять request.user
+        ## Пользователь (активный) - список всех записей "ученик-класс" с активными ролями и активными пользователями активной школы, в которой должен состоять request.user
+      parameters:
+        - in: header
+          name: school
+          schema:
+            type: integer
+          description: filter by school_id
+          required: false
+        - in: query
+          name: cls_id
+          schema:
+            type: integer
+          description: filter by cls_id
+        - in: query
+          name: student_id
+          schema:
+            type: integer
+          description: filter by student_id
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, cls, student
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - classes
+
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: CreateStudentClass
+      summary: Create a student-class
+      description: |
+        # Создание записей ученик-класс
+        ## Cуперпользователь - полный доступ
+        ## Активный завуч - создание записей для активных пользователей. Завуч должен быть в той же активной школе, что и класс.
+        ## Важно! Связь для ученика с классом может быть только одна
+        ## Валидация ученика и класса - школы должны совпадать
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                student_id:
+                  type: integer
+                  example: 1
+                cls_id:
+                  type: integer
+                  example: 1
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - classes
+
+  /student-classes/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get student-classes by id
+      operationId: GetStudentClasses
+      description: |
+        # Получение записи ученик-класс
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - любые записи активных пользователей в своей активной школе
+        ## Активный пользователь - любые записи активных пользователей с активной ролью ученик в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - classes
+    patch:
+      security:
+        - bearerAuth: [ ]
+      summary: Update the student-classes by id
+      operationId: UpdateStudentClasses
+      description: |
+        # Редактирование записи ученик-класс
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - редактирование записей для активных пользователей. Завуч должен быть в той же активной школе, что и класс.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                student_id:
+                  type: integer
+                  example: 1
+                cls_id:
+                  type: integer
+                  example: 1
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - classes
+    delete:
+      security:
+        - bearerAuth: [ ]
+      summary: Delete the student-classes by id
+      operationId: DeleteStudentClasses
+      description: |
+        # Удаление записи ученик-класс из БД
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - удаление записей для активных пользователей. Завуч должен быть в той же активной школе, что и класс.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '204':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - classes
+
+  /groups/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get group's list by token
+      operationId: Groups
+      description: |
+        # Получение списка групп:
+        ## Суперпользователь - абсолютно все группы
+        ## Активный пользователь - просмотр всех групп в активных школах, в которых состоит и request.user
+        ## Добавлена фильтрация по school_id в header - учитывается не только значение в поле school, но также и школа в поле cls (класс)
+      parameters:
+        - in: header
+          name: school
+          schema:
+            type: integer
+          description: filter by school_id
+          required: false
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search by name
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, name, school, cls
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - groups
+
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: CreateGroup
+      summary: Create a group
+      description: |
+        # Создание группы
+        ## Cуперпользователь - создание групп для любых школ
+        ## Активный завуч - создание групп только в своей активной школе
+        ## В request body перечислены все возможные поля
+        ### Обязательные поля: "name"
+        ### Обязательно! одно и только одно поле из двух: school_id, cls_id
+        ### Проверка на заполнение одного и только одного поля из двух: school_id, cls_id
+        ### Проверка на валидацию school_id
+        ### Проверка на валидацию cls_id
+        ### Проверка на уникальность названия внутри школы
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: name
+                school_id:
+                  type: integer
+                  example: 1
+                cls_id:
+                  type: integer
+                  example: 1
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - groups
+
+  /groups/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get the group by id
+      operationId: GetGroup
+      description: |
+        # Получение группы
+        ## Суперпользователь - полный доступ
+        ## Активный пользователь - просмотр группы в активной школе, в которой состоит и request.user
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - groups
+    patch:
+      security:
+        - bearerAuth: [ ]
+      summary: Update the group by id
+      operationId: UpdateGroup
+      description: |
+        # Редактирование группы
+        ## Cуперпользователь - редактирование группы для любых школ
+        ## Активный завуч - редактирование группы только в своей активной школе
+        ## В request body перечислены все возможные поля
+        ### !!! поле school_id нельзя менять на cls_id. TODO: проверка наличия учеников в других классах и передача их списка в 400 ответе
+        ### Проверка на валидацию school_id
+        ### Проверка на валидацию cls_id
+        ### Проверка на уникальность названия внутри школы
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: name
+                school_id:
+                  type: integer
+                  example: 1
+                cls_id:
+                  type: integer
+                  example: 1
+            required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - groups
+    delete:
+      security:
+        - bearerAuth: [ ]
+      summary: Delete the group by id
+      operationId: DeleteGroup
+      description: |
+        # Удаление группы из БД
+        ## Cуперпользователь - удаление группы для любых школ
+        ## Активный завуч - удаление группы только в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '204':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - groups
+
+  /student-groups/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get student-groups list by token
+      operationId: StudentGroups
+      description: |
+        # Получение списка ученик-группа:
+        ## Суперпользователь - абсолютно все записи "ученик-группа"
+        ## Активный завуч - список всех записей "ученик-группа" с активными пользователями активной школы, в которой должен состоять request.user
+        ## Пользователь (активный) - список всех записей "ученик-группа" с активными ролями и активными пользователями активной школы, в которой должен состоять request.user
+      parameters:
+        - in: header
+          name: school
+          schema:
+            type: integer
+          description: filter by school_id
+          required: false
+        - in: query
+          name: group_id
+          schema:
+            type: integer
+          description: filter by group_id
+        - in: query
+          name: student_id
+          schema:
+            type: integer
+          description: filter by student_id
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, group, student
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - groups
+
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: CreateStudentGroup
+      summary: Create a student-group
+      description: |
+        # Создание записей ученик-группа
+        ## Cуперпользователь - полный доступ
+        ## Активный завуч - создание записей для активных пользователей. Завуч должен быть в той же активной школе, что и класс.
+        ## Валидация ученика и группы - школы должны совпадать
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                student_id:
+                  type: integer
+                  example: 1
+                group_id:
+                  type: integer
+                  example: 1
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - groups
+
+  /student-groups/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get student-group by id
+      operationId: GetStudentGroup
+      description: |
+        # Получение записи ученик-группа
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - любые записи активных пользователей в своей активной школе
+        ## Активный пользователь - любые записи активных пользователей с активной ролью ученик в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - groups
+    patch:
+      security:
+        - bearerAuth: [ ]
+      summary: Update the student-group by id
+      operationId: UpdateStudentGroup
+      description: |
+        # Редактирование записи ученик-группа
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - редактирование записей для активных пользователей. Завуч должен быть в той же активной школе, что и класс.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                student_id:
+                  type: integer
+                  example: 1
+                group_id:
+                  type: integer
+                  example: 1
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - groups
+    delete:
+      security:
+        - bearerAuth: [ ]
+      summary: Delete the student-group by id
+      operationId: DeleteStudentGroup
+      description: |
+        # Удаление записи ученик-группа из БД
+        ## Суперпользователь - полный доступ
+        ## Активный завуч - удаление записей для активных пользователей. Завуч должен быть в той же активной школе, что и класс.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '204':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - groups
+
+  /lessons/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get lesson's list by token
+      operationId: Lessons
+      description: |
+        # Получение списка уроков:
+        ## Суперпользователь - абсолютно все уроки
+        ## Активный пользователь - просмотр всех уроков в активных школах, в которых состоит и request.user
+        ## Добавлена фильтрация по school_id в header - берется значение из поля object.school
+      parameters:
+        - in: header
+          name: school
+          schema:
+            type: integer
+          description: filter by school_id
+          required: false
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, teacher, facultative_teacher, object
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - lessons
+
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: CreateLesson
+      summary: Create a lesson
+      description: |
+        # Создание уроков
+        ## Cуперпользователь - создание уроков для любых школ
+        ## Активный завуч - создание уроков только в своей активной школе
+        ## В request body перечислены все возможные поля
+        ### Обязательные поля: "object_id"
+        ### Обязательно! одно и только одно поле из двух: teacher_id, facultative_teacher_id
+        ### Проверка на заполнение одного и только одного поля из двух: teacher_id, facultative_teacher_id
+        ### Проверка на валидацию object_id
+        ### Проверка на валидацию teacher_id - роль и пользователь должны быть активными
+        ### Проверка на валидацию facultative_teacher_id - роль и пользователь должны быть активными
+        ### Проверка на соответствие школ во всех внешних ключах
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                teacher_id:
+                  type: integer
+                  example: 1
+                facultative_teacher_id:
+                  type: integer
+                  example: 1
+                object_id:
+                  type: integer
+                  example: 1
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - lessons
+
+  /lessons/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get the lesson by id
+      operationId: GetLesson
+      description: |
+        # Получение урока
+        ## Суперпользователь - полный доступ
+        ## Активный пользователь - просмотр урока в активной школе, в которой состоит и request.user
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - lessons
+    patch:
+      security:
+        - bearerAuth: [ ]
+      summary: Update the lesson by id
+      operationId: UpdateLesson
+      description: |
+        # Редактирование урока
+        ## Cуперпользователь - редактирование урока для любых школ
+        ## Активный завуч - редактирование урока только в своей активной школе
+        ## В request body перечислены все возможные поля
+        ### Проверка на заполнение одного и только одного поля из двух: teacher_id, facultative_teacher_id
+        ### !!! при заполнении поля teacher_id значение в поле facultative_teacher_id очищается, и наоборот
+        ### Проверка на валидацию object_id
+        ### Проверка на валидацию teacher_id - роль и пользователь должны быть активными
+        ### Проверка на валидацию facultative_teacher_id - роль и пользователь должны быть активными
+        ### Проверка на соответствие школ во всех внешних ключах
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                teacher_id:
+                  type: integer
+                  example: 1
+                facultative_teacher_id:
+                  type: integer
+                  example: 1
+                object_id:
+                  type: integer
+                  example: 1
+            required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - lessons
+    delete:
+        security:
+          - bearerAuth: [ ]
+        summary: Delete the lesson by id
+        operationId: DeleteLesson
+        description: |
+          # Удаление урока из БД
+          ## Cуперпользователь - удаление урока для любых школ
+          ## Активный завуч - удаление урока только в своей активной школе
+        parameters:
+          - in: path
+            name: id
+            schema:
+              type: integer
+              example: 1
+            required: true
+        responses:
+          '204':
+            content:
+              application/json:
+                schema: { }
+            description: OK
+        tags:
+          - lessons
+
+  /time-lessons/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get time lesson's list by token
+      operationId: TimeLessons
+      description: |
+        # Получение списка времени расписания уроков (по четвертям):
+        ## Суперпользователь - абсолютно все 
+        ## Активный пользователь - просмотр всех данных в активных школах, в которых состоит и request.user
+      parameters:
+        - in: query
+          name: school_id
+          schema:
+            type: integer
+          description: filter by school_id
+        - in: query
+          name: search
+          period:
+            type: string
+          description: Search by period
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, period, school
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - time_lessons
+
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: CreateTimeLesson
+      summary: Create a time lesson
+      description: |
+        # Создание времени расписания уроков
+        ## Cуперпользователь - создание для любых школ
+        ## Активный завуч - создание только в своей активной школе
+        ## В request body перечислены все возможные поля
+        ### Обязательные поля: "period", "school_id", "lesson1_start", "lesson1_end", "lesson2_start", "lesson2_end", "lesson3_start", "lesson3_end", "lesson4_start", "lesson4_end", "lesson5_start", "lesson5_end", "lesson6_start", "lesson6_end"
+        ### Проверка на валидацию period - уникальные значения внутри школы
+        ### Проверка на валидацию school_id 
+        ### Проверка на валидацию "lesson_start", "lesson_end" - следующий урок не может начинаться раньше окончания предыдущего
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                period:
+                  type: string
+                  example: 2023-2024 учебный год
+                lesson1_start:
+                  type: string
+                  format: date-time
+                  example: "8:40:00"
+                lesson1_end:
+                  type: string
+                  format: date-time
+                  example: "9:25:00"
+                lesson2_start:
+                  type: string
+                  format: date-time
+                  example: "9:50:00"
+                lesson2_end:
+                  type: string
+                  format: date-time
+                  example: "10:20:00"
+                lesson3_start:
+                  type: string
+                  format: date-time
+                  example: "10:35:00"
+                lesson3_end:
+                  type: string
+                  format: date-time
+                  example: "11:20:00"
+                lesson4_start:
+                  type: string
+                  format: date-time
+                  example: "11:45:00"
+                lesson4_end:
+                  type: string
+                  format: date-time
+                  example: "12:30:00"
+                lesson5_start:
+                  type: string
+                  format: date-time
+                  example: "12:45:00"
+                lesson5_end:
+                  type: string
+                  format: date-time
+                  example: "13:30:00"
+                lesson6_start:
+                  type: string
+                  format: date-time
+                  example: "14:10:00"
+                lesson6_end:
+                  type: string
+                  format: date-time
+                  example: "14:55:00"
+                lesson7_start:
+                  type: string
+                  format: date-time
+                  example: "15:00:00"
+                lesson7_end:
+                  type: string
+                  format: date-time
+                  example: "15:45:00"
+                lesson8_start:
+                  type: string
+                  format: date-time
+                  example: "16:00:00"
+                lesson8_end:
+                  type: string
+                  format: date-time
+                  example: "16:45:00"
+                lesson9_start:
+                  type: string
+                  format: date-time
+                  example: "17:00:00"
+                lesson9_end:
+                  type: string
+                  format: date-time
+                  example: "17:45:00"
+                lesson10_start:
+                  type: string
+                  format: date-time
+                  example: "18:00:00"
+                lesson10_end:
+                  type: string
+                  format: date-time
+                  example: "18:45:00"
+                school_id:
+                  type: integer
+                  example: 1
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - time_lessons
+
+  /time-lessons/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get the time lesson by id
+      operationId: GetTimeLesson
+      description: |
+        # Получение времени расписания уроков
+        ## Суперпользователь - полный доступ
+        ## Активный пользователь - просмотр урока в активной школе, в которой состоит и request.user
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - time_lessons
+    patch:
+      security:
+        - bearerAuth: [ ]
+      summary: Update the time lesson by id
+      operationId: UpdateTimeLesson
+      description: |
+        # Редактирование времени расписания уроков
+        ## Cуперпользователь - редактирование для любых школ
+        ## Активный завуч - редактирование только в своей активной школе
+        ## В request body перечислены все возможные поля
+        ### Проверка на валидацию period - уникальные значения внутри школы
+        ### Проверка на валидацию school_id
+        ### Проверка на валидацию "lesson_start", "lesson_end" - следующий урок не может начинаться раньше окончания предыдущего
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                period:
+                  type: string
+                  example: 2023-2024 учебный год
+                lesson1_start:
+                  type: string
+                  format: date-time
+                  example: "8:40:00"
+                lesson1_end:
+                  type: string
+                  format: date-time
+                  example: "9:25:00"
+                lesson2_start:
+                  type: string
+                  format: date-time
+                  example: "9:50:00"
+                lesson2_end:
+                  type: string
+                  format: date-time
+                  example: "10:20:00"
+                lesson3_start:
+                  type: string
+                  format: date-time
+                  example: "10:35:00"
+                lesson3_end:
+                  type: string
+                  format: date-time
+                  example: "11:20:00"
+                lesson4_start:
+                  type: string
+                  format: date-time
+                  example: "11:45:00"
+                lesson4_end:
+                  type: string
+                  format: date-time
+                  example: "12:30:00"
+                lesson5_start:
+                  type: string
+                  format: date-time
+                  example: "12:45:00"
+                lesson5_end:
+                  type: string
+                  format: date-time
+                  example: "13:30:00"
+                lesson6_start:
+                  type: string
+                  format: date-time
+                  example: "14:10:00"
+                lesson6_end:
+                  type: string
+                  format: date-time
+                  example: "14:55:00"
+                lesson7_start:
+                  type: string
+                  format: date-time
+                  example: "15:00:00"
+                lesson7_end:
+                  type: string
+                  format: date-time
+                  example: "15:45:00"
+                lesson8_start:
+                  type: string
+                  format: date-time
+                  example: "16:00:00"
+                lesson8_end:
+                  type: string
+                  format: date-time
+                  example: "16:45:00"
+                lesson9_start:
+                  type: string
+                  format: date-time
+                  example: "17:00:00"
+                lesson9_end:
+                  type: string
+                  format: date-time
+                  example: "17:45:00"
+                lesson10_start:
+                  type: string
+                  format: date-time
+                  example: "18:00:00"
+                lesson10_end:
+                  type: string
+                  format: date-time
+                  example: "18:45:00"
+                school_id:
+                  type: integer
+                  example: 1
+            required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - time_lessons
+    delete:
+        security:
+          - bearerAuth: [ ]
+        summary: Delete the time lesson by id
+        operationId: DeleteTimeLesson
+        description: |
+          # Удаление из БД
+          ## Cуперпользователь - удаление для любых школ
+          ## Активный завуч - удаление только в своей активной школе
+        parameters:
+          - in: path
+            name: id
+            schema:
+              type: integer
+              example: 1
+            required: true
+        responses:
+          '204':
+            content:
+              application/json:
+                schema: { }
+            description: OK
+        tags:
+          - time_lessons
+
+  /schedules/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get time schedule's list by token
+      operationId: Schedules
+      description: |
+        # Получение расписания уроков:
+        ## Суперпользователь - абсолютно все 
+        ## Активный пользователь - просмотр всех данных в активных школах, в которых состоит и request.user
+        ## Фильтрация:
+        ### Начало урока - нижняя граница (не раньше чем)
+        ### Конец урока - верхняя граница (не позже чем)
+        ### Номер урока
+        ### Отмененные уроки
+        ### Группа
+        ### Класс
+        ### Ученик
+        ### Учитель (учитель факультатива)
+        ### Кабинет
+        ### studentAll - фильтрация по занятиям для ученика, а также группам и классу, в которых он состоит
+      parameters:
+        - in: query
+          name: start__gte
+          schema:
+            type: string
+            format: date
+            example: "2024-01-02T00:00:00+03:00"
+          description: filter by great start
+        - in: query
+          name: end__lte
+          schema:
+            type: string
+            format: date
+            example: "2024-01-02T00:00:00+03:00"
+          description: filter by less end
+        - in: query
+          name: number
+          schema:
+            type: integer
+          description: filter by number of lesson
+        - in: query
+          name: is_cancelled
+          schema:
+            type: boolean
+          description: filter by is_cancelled
+        - in: query
+          name: studentAll_id
+          schema:
+            type: integer
+          description: filter by studentAll_id
+        - in: query
+          name: group_id
+          schema:
+            type: integer
+          description: filter by group_id
+        - in: query
+          name: cls_id
+          schema:
+            type: integer
+          description: filter by cls_id
+        - in: query
+          name: cabinet_id
+          schema:
+            type: integer
+          description: filter by cabinet_id
+        - in: query
+          name: teacher_id
+          schema:
+            type: integer
+          description: filter by teacher_id
+        - in: query
+          name: facultative_teacher_id
+          schema:
+            type: integer
+          description: filter by facultative_teacher_id
+        - in: query
+          name: student_id
+          schema:
+            type: integer
+          description: filter by student_id
+        - in: query
+          name: school_id
+          schema:
+            type: integer
+          description: filter by school_id
+        - in: query
+          name: ordering
+          schema:
+            type: string
+          description: Order by id, number, start, end, is_cancelled, lesson, group, cls, cabinet, student
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: The number of items to skip before starting to collect the result set
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - schedules
+
+    post:
+      security:
+        - bearerAuth: [ ]
+      operationId: CreateSchedule
+      summary: Create a schedule
+      description: |
+        # Создание расписания уроков
+        ## Cуперпользователь - создание для любых школ
+        ## Активный завуч - создание только в своей активной школе
+        ## В request body перечислены все возможные поля
+        ### Обязательные поля: "start", "end", "lesson_id"
+        ### Обязательно одно и только одно поле из "student_id", "group_id", "cls_id"
+        ### Проверка на валидацию "lesson_id", "lesson_replace_id", "group_id", "cls_id", "cabinet_id", "student_id"
+        ### Проверка на валидацию number - целочисленные значения от 1 до 10. !!! Указывается только в случае "шаблонного" времени уроков 
+        ### Проверка cabinet_id - если указано cls_id и не указан cabinet_id, то кабинет берется класса, если не указано cls_id поле cabinet_id обязательно для заполнения
+        ### Поля start и end - если создается строка с "шаблонным" временем, то в start и end на клиенте записывается шаблонное время. В этом случае поле number будет обязательным (в случае изменения шаблонного времени все будущие строки расписания будут менять значения start и end по number урока)
+        ### Проверка на соответствие школ во всех внешних ключах
+        ### Проверка на уникальность времени - начало урока start для ученик | группа | класс не может быть в диапазоне start-end уже существующей записи
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                number:
+                  type: integer
+                  format: time
+                  example: 1
+                start:
+                  type: string
+                  format: date-time
+                  example: "2000-01-01T09:50:00+03:00"
+                end:
+                  type: string
+                  format: date-time
+                  example: "2000-01-01T10:20:00+03:00"
+                comment:
+                  type: string
+                  example: "Не забудь голову"
+                replace_comment:
+                  type: string
+                  example: "Урок заменен по уважительной причине"
+                is_cancelled:
+                  type: boolean
+                  example: false
+                cancelled_comment:
+                  type: string
+                  example: "Урок отменен. Потому что так надо было"
+                lesson_id:
+                  type: integer
+                  example: 1
+                lesson_replace_id:
+                  type: integer
+                  example: 1
+                group_id:
+                  type: integer
+                  example: 1
+                cls_id:
+                  type: integer
+                  example: 1
+                cabinet_id:
+                  type: integer
+                  example: 1
+                student_id:
+                  type: integer
+                  example: 1
+                time_lesson_id:
+                  type: integer
+                  example: 1
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - schedules
+
+  /schedules/{id}/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get the time schedule by id
+      operationId: GetSchedule
+      description: |
+        # Получение расписания уроков
+        ## Суперпользователь - полный доступ
+        ## Активный пользователь - просмотр урока в активной школе, в которой состоит и request.user
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - schedules
+    patch:
+      security:
+        - bearerAuth: [ ]
+      summary: Update the schedule by id
+      operationId: UpdateSchedule
+      description: |
+        # Редактирование расписания уроков
+        ## Cуперпользователь - редактирование расписания урока для любых школ
+        ## Активный завуч - редактирование расписания урока только в своей активной школе
+        ## В request body перечислены все возможные поля
+        ### Обязательно одно и только одно поле из "student_id", "group_id", "cls_id"
+        ### !!! при заполнении одного из трех полей (выше) значение в двух других очищается
+        ### Проверка на валидацию "lesson_id", "lesson_replace_id", "group_id", "cls_id", "cabinet_id", "student_id"
+        ### Проверка на валидацию number - целочисленные значения от 1 до 10. !!! Указывается только в случае "шаблонного" времени уроков 
+        ### Проверка cabinet_id - если указано cls_id, то кабинет берется класса, иначе поле обязательно для заполнения
+        ### Проверка на соответствие школ во всех внешних ключах
+        ### Проверка на уникальность времени - начало урока start для ученик | группа | класс не может быть в диапазоне start-end уже существующей записи
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                number:
+                  type: integer
+                  format: time
+                  example: 1
+                start:
+                  type: string
+                  format: date-time
+                  example: "2000-01-01T09:50:00+03:00"
+                end:
+                  type: string
+                  format: date-time
+                  example: "2000-01-01T10:20:00+03:00"
+                comment:
+                  type: string
+                  example: "Не забудь голову"
+                replace_comment:
+                  type: string
+                  example: "Урок заменен по уважительной причине"
+                is_cancelled:
+                  type: boolean
+                  example: false
+                cancelled_comment:
+                  type: string
+                  example: "Урок отменен. Потому что так надо было"
+                lesson_id:
+                  type: integer
+                  example: 1
+                lesson_replace_id:
+                  type: integer
+                  example: 1
+                group_id:
+                  type: integer
+                  example: 1
+                cls_id:
+                  type: integer
+                  example: 1
+                cabinet_id:
+                  type: integer
+                  example: 1
+                student_id:
+                  type: integer
+                  example: 1
+                time_lesson_id:
+                  type: integer
+                  example: 1
+            required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - schedules
+    delete:
+      security:
+        - bearerAuth: [ ]
+      summary: Delete the schedule by id
+      operationId: DeleteSchedule
+      description: |
+        # Удаление из БД
+        ## Cуперпользователь - удаление для любых школ
+        ## Активный завуч - удаление только в своей активной школе
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+            example: 1
+          required: true
+      responses:
+        '204':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - schedules
+
+  /1C/partners-get/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get a partner's list by token
+      operationId: Partners-get1C
+      description: |
+        # Список партнеров в 1С в зависимости от роли пользователя (определяется по токену):
+        ## Администратор - все партнеры
+        ## Завуч - все партнеры
+      parameters: [ ]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - 1C
+
+  /1C/partners/:
+    post:
+      security:
+        - basicAuth: [ ]
+      operationId: Partners1C
+      summary: Post or update data of partners 1C
+      description: |
+        # Доступ только у юзернейма 1С
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema: { }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - 1C
+
+  /1C/users-get/:
+    get:
+      security:
+        - bearerAuth: [ ]
+      summary: Get a user's list by token
+      operationId: Users-get1C
+      description: |
+        # Список пар ученик-родитель в 1С в зависимости от роли пользователя (определяется по токену):
+        ## Администратор - все пары
+        ## Завуч - все пары
+      parameters: [ ]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - 1C
+
+  /1C/users/:
+    post:
+      security:
+        - basicAuth: [ ]
+      operationId: Users1C
+      summary: Post or update data of users 1C
+      description: |
+        # Доступ только у юзернейма 1С
+      parameters: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema: { }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { }
+          description: OK
+      tags:
+        - 1C
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    basicAuth:
+      type: http
+      scheme: basic
+
+
